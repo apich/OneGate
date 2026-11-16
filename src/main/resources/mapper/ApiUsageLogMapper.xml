@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.onegate.domain.mapper.ApiUsageLogMapper">
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO api_usage_log
+            (request_id, tenant_id, model_name, provider, channel_id,
+             prompt_tokens, completion_tokens, total_tokens, cost_ms, finish_reason, estimated, create_time)
+        VALUES
+            (#{log.requestId}, #{log.tenantId}, #{log.modelName}, #{log.provider}, #{log.channelId},
+             #{log.promptTokens}, #{log.completionTokens}, #{log.totalTokens}, #{log.costMs},
+             #{log.finishReason}, #{log.estimated}, COALESCE(#{log.createTime}, NOW(3)))
+    </insert>
+
+    <select id="selectCoveringStats" resultType="com.onegate.domain.dto.UsageStatsResponse">
+        SELECT #{tenantId} AS tenant_id,
+               <choose>
+                   <when test="modelName != null and modelName != ''">#{modelName}</when>
+                   <otherwise>NULL</otherwise>
+               </choose> AS model_name,
+               COUNT(*) AS request_count,
+               COALESCE(SUM(total_tokens), 0) AS total_tokens
+        FROM api_usage_log
+        <choose>
+            <when test="modelName != null and modelName != ''">
+              USE INDEX (idx_tenant_model_time_tokens)
+            </when>
+            <otherwise>
+              USE INDEX (idx_tenant_time_tokens)
+            </otherwise>
+        </choose>
+        WHERE tenant_id = #{tenantId}
+          <if test="modelName != null and modelName != ''">
+            AND model_name = #{modelName}
+          </if>
+          <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+          </if>
+          <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+          </if>
+    </select>
+
+    <select id="selectByCursor" resultType="com.onegate.domain.entity.ApiUsageLog">
+        SELECT id, request_id, tenant_id, model_name, provider, channel_id,
+               prompt_tokens, completion_tokens, total_tokens, cost_ms, finish_reason, estimated, create_time
+        FROM api_usage_log
+        <choose>
+            <when test="modelName != null and modelName != ''">
+              USE INDEX (idx_tenant_model_time)
+            </when>
+            <otherwise>
+              USE INDEX (idx_tenant_create_time)
+            </otherwise>
+        </choose>
+        WHERE tenant_id = #{tenantId}
+          <if test="modelName != null and modelName != ''">
+            AND model_name = #{modelName}
+          </if>
+          <if test="lastCreateTime != null and lastId != null">
+            AND create_time &lt;= #{lastCreateTime}
+            AND (create_time, id) &lt; (#{lastCreateTime}, #{lastId})
+          </if>
+        ORDER BY create_time DESC, id DESC
+        LIMIT #{pageSize}
+    </select>
+
+    <select id="selectByTraditionalOffset" resultType="com.onegate.domain.entity.ApiUsageLog" timeout="30">
+        SELECT id, request_id, tenant_id, model_name, provider, channel_id,
+               prompt_tokens, completion_tokens, total_tokens, cost_ms, finish_reason, estimated, create_time
+        FROM api_usage_log
+        <choose>
+            <when test="modelName != null and modelName != ''">
+              USE INDEX (idx_tenant_model_time)
+            </when>
+            <otherwise>
+              USE INDEX (idx_tenant_create_time)
+            </otherwise>
+        </choose>
+        WHERE tenant_id = #{tenantId}
+          <if test="modelName != null and modelName != ''">
+            AND model_name = #{modelName}
+          </if>
+        ORDER BY create_time DESC, id DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countByTenant" resultType="long">
+        SELECT COUNT(*)
+        FROM api_usage_log
+        WHERE tenant_id = #{tenantId}
+    </select>
+
+</mapper>

@@ -1,0 +1,137 @@
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 256
+      min-spare: 32
+    accept-count: 500
+
+spring:
+  application:
+    name: one-gate
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/one_gate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      pool-name: OneGateHikariPool
+      # 适配本地 MySQL max_connections=20，避免连接池撑爆数据库
+      maximum-pool-size: 12
+      minimum-idle: 4
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 32
+          max-idle: 16
+          min-idle: 4
+          max-wait: 2000ms
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 32
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 500ms
+          max-attempts: 3
+          multiplier: 2.0
+          max-interval: 3000ms
+
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.onegate.domain.entity,com.onegate.domain.dto
+  configuration:
+    map-underscore-to-camel-case: true
+    default-statement-timeout: 10
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+onegate:
+  # L1 Caffeine + L2 Redis 多级认证缓存 TTL
+  auth-cache-ttl-seconds: 300
+  null-cache-ttl-seconds: 60
+  caffeine-max-size: 10000
+
+  # 上游大模型代理与首字超时(TTFT) / 熔断 / 全链路超时参数
+  connect-timeout-ms: 2000
+  ttft-timeout-ms: 3000
+  read-timeout-ms: 60000
+  non-stream-timeout-ms: 30000
+  stream-timeout-ms: 180000
+  max-tokens-limit: 65536
+  failure-threshold: 3
+  cooldown-seconds: 30
+  max-failover-attempts: 2
+
+  # Redis 预占额度冻结 TTL 与 RabbitMQ 死信兜底延迟时间
+  freeze-ttl-seconds: 600
+  freeze-delay-ms: 180000
+  quota-seen-ttl-seconds: 86400
+
+  # 安全防线默认收紧：生产默认关闭内置 Mock 且不内置硬编码管理员密码
+  mock-enabled: ${ONEGATE_MOCK_ENABLED:false}
+  admin-token: ${ONEGATE_ADMIN_TOKEN:}
+  cors-allowed-origins: ${ONEGATE_CORS_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+
+  # 按厂商/模型维度隔离的舱壁线程池配置
+  pools:
+    deepseek:
+      core-size: 16
+      max-size: 64
+      queue-capacity: 256
+      keep-alive-seconds: 60
+    qwen:
+      core-size: 16
+      max-size: 64
+      queue-capacity: 256
+      keep-alive-seconds: 60
+    openai:
+      core-size: 16
+      max-size: 64
+      queue-capacity: 256
+      keep-alive-seconds: 60
+    default:
+      core-size: 8
+      max-size: 32
+      queue-capacity: 128
+      keep-alive-seconds: 60
+
+logging:
+  level:
+    com.onegate: INFO

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.onegate.domain.mapper.BillingDeadLetterMapper">
+
+    <select id="selectPending" resultType="com.onegate.domain.entity.BillingDeadLetterRecord">
+        SELECT id, request_id, tenant_id, payload, error_reason, status, create_time, update_time
+        FROM billing_dead_letter_record
+        WHERE status = 'PENDING'
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="markResolved">
+        UPDATE billing_dead_letter_record
+        SET status      = 'RESOLVED',
+            update_time = NOW(3)
+        WHERE id = #{id}
+    </update>
+
+</mapper>

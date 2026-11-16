@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.onegate.domain.mapper.TenantAccountMapper">
+
+    <select id="selectByApiKey" resultType="com.onegate.domain.entity.TenantAccount">
+        SELECT id, tenant_id, tenant_name, api_key, balance, frozen_tokens,
+               rpm_limit, tpm_limit, status, version, create_time, update_time
+        FROM tenant_account
+        WHERE api_key = #{apiKey}
+        LIMIT 1
+    </select>
+
+    <select id="selectByTenantId" resultType="com.onegate.domain.entity.TenantAccount">
+        SELECT id, tenant_id, tenant_name, api_key, balance, frozen_tokens,
+               rpm_limit, tpm_limit, status, version, create_time, update_time
+        FROM tenant_account
+        WHERE tenant_id = #{tenantId}
+        LIMIT 1
+    </select>
+
+    <update id="deductBalanceAtomically">
+        UPDATE tenant_account
+        SET balance     = balance - #{actualCost},
+            update_time = NOW(3)
+        WHERE tenant_id = #{tenantId}
+          AND balance &gt;= #{actualCost}
+    </update>
+
+    <update id="rechargeBalance">
+        UPDATE tenant_account
+        SET balance     = balance + #{amount},
+            update_time = NOW(3)
+        WHERE tenant_id = #{tenantId}
+    </update>
+
+</mapper>
